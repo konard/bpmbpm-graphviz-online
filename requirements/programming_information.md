@@ -1,0 +1,20 @@
+## current project
+https://github.com/bpmbpm/graphviz-online/tree/main/ver1
+## code
+Браузерный JS  
+Код должен быть хорошо читаемым человеку с низким уровнем знания js. Избегай стрелочных функций.
+
+### Pull request
+В Pull request указывай измененные файлы. При отсутсвии изменений явно указывай, что изменений нет.  
+
+## dot
+1. Не используй: 
+```
+label=<<TABLE BORDER="0" CELLBORDER="0" CELLSPACING="0"><TR><TD><IMG SRC="pic/Ульянов_Владимир_Ильич.png" SCALE="TRUE"/></TD></TR><TR><TD ALIGN="CENTER"><FONT POINT-SIZE="11">Ульянов Владимир Ильич</FONT></TD></TR><TR><TD ALIGN="CENTER"><FONT POINT-SIZE="10">1870–1924</FONT></TD></TR></TABLE>>];
+```
+используй легко читаемый код dot (без html - тегов).
+
+2. Для добавления минифото на дерево используй dot тег image="
+
+### doc
+Коммениируй код на русском. 
