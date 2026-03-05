@@ -5,14 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Graphviz Online — поддержка image=</title>
 
-  <!-- Библиотека d3 для работы с SVG -->
-  <script src="https://cdn.jsdelivr.net/npm/d3@7/dist/d3.min.js"></script>
-
-  <!-- Ядро WebAssembly Graphviz (загружается как worker-скрипт) -->
-  <script src="https://cdn.jsdelivr.net/npm/@hpcc-js/wasm@2/dist/graphviz.umd.js" type="javascript/worker"></script>
-
-  <!-- Библиотека d3-graphviz: рендеринг dot-кода в SVG с поддержкой addImage() -->
-  <script src="https://cdn.jsdelivr.net/npm/d3-graphviz@5/build/d3-graphviz.js"></script>
+  <!-- Ядро @viz-js/viz — тот же движок, что используется в family-tree/ver2 -->
+  <!-- Обеспечивает корректный рендеринг узлов с атрибутом image= через опцию images -->
+  <script src="https://unpkg.com/@viz-js/viz@3.4.0/lib/viz-standalone.js"></script>
 
   <style>
     /* Основные стили страницы */
@@ -62,6 +57,7 @@
       gap: 6px;
       margin-top: 6px;
       flex-wrap: wrap;
+      align-items: center;
     }
 
     button {
@@ -90,6 +86,24 @@
       background: #1565C0;
     }
 
+    #btn-download {
+      background: #FF9800;
+      color: white;
+    }
+
+    #btn-download:hover {
+      background: #E65100;
+    }
+
+    /* Выпадающий список выбора движка */
+    #engine-select {
+      padding: 5px 8px;
+      border: 1px solid #ccc;
+      border-radius: 4px;
+      font-size: 13px;
+      background: #fff;
+    }
+
     /* Сообщения об ошибках */
     #error-msg {
       color: #c00;
@@ -104,14 +118,54 @@
       background: white;
       border: 1px solid #ccc;
       border-radius: 4px;
+      overflow: hidden;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Контейнер с прокруткой для SVG */
+    #graph-scroll {
+      flex: 1;
       overflow: auto;
       position: relative;
     }
 
     /* Контейнер SVG внутри правой панели */
     #graph {
-      width: 100%;
-      height: 100%;
+      display: inline-block;
+      min-width: 100%;
+      min-height: 100%;
+      padding: 8px;
+    }
+
+    /* Панель управления масштабом (внизу правой панели) */
+    #zoom-controls {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 8px;
+      border-top: 1px solid #eee;
+      background: #fafafa;
+    }
+
+    #zoom-controls button {
+      padding: 4px 10px;
+      background: #e0e0e0;
+      color: #333;
+      font-size: 14px;
+      min-width: 32px;
+    }
+
+    #zoom-controls button:hover {
+      background: #bdbdbd;
+    }
+
+    #zoom-level {
+      font-size: 13px;
+      color: #555;
+      min-width: 42px;
+      text-align: center;
     }
 
     /* Подсказка о ссылке */
@@ -134,11 +188,24 @@
     <textarea id="dot-editor" spellcheck="false"></textarea>
 
     <div id="controls">
+      <!-- Выбор движка Graphviz (dot, neato, fdp, sfdp, circo, twopi) -->
+      <select id="engine-select" title="Движок Graphviz">
+        <option value="dot" selected>dot</option>
+        <option value="neato">neato</option>
+        <option value="fdp">fdp</option>
+        <option value="sfdp">sfdp</option>
+        <option value="circo">circo</option>
+        <option value="twopi">twopi</option>
+      </select>
+
       <!-- Кнопка: отрисовать граф -->
       <button id="btn-render" onclick="zapustit()">Отрисовать</button>
 
       <!-- Кнопка: сформировать ссылку с текущим кодом dot -->
       <button id="btn-share" onclick="sozdat_ssylku()">Получить ссылку</button>
+
+      <!-- Кнопка: скачать SVG -->
+      <button id="btn-download" onclick="skachat_svg()">Скачать SVG</button>
     </div>
 
     <!-- Область для сообщения об ошибке при рендеринге -->
@@ -150,12 +217,27 @@
 
   <!-- Правая панель: граф -->
   <div id="graph-panel">
-    <div id="graph"></div>
+    <div id="graph-scroll">
+      <div id="graph"></div>
+    </div>
+    <!-- Элементы управления масштабом (как в dreampuf.github.io/GraphvizOnline) -->
+    <div id="zoom-controls">
+      <button onclick="izmenity_masshtab(0.1)" title="Увеличить">+</button>
+      <span id="zoom-level">100%</span>
+      <button onclick="izmenity_masshtab(-0.1)" title="Уменьшить">−</button>
+      <button onclick="sbrosit_masshtab()" title="Сбросить масштаб">Сброс</button>
+      <button onclick="vpisat_v_okno()" title="Вписать в окно">Вписать</button>
+    </div>
   </div>
 
 </div>
 
 <script>
+  // ========================================================
+  // Текущий масштаб отображения графа
+  // ========================================================
+  var tekuschiy_masshtab = 1.0;
+
   // ========================================================
   // Пример кода dot по умолчанию (без изображений)
   // Используется если в URL не передан параметр с кодом
@@ -240,9 +322,11 @@
   // ========================================================
   // Главная функция: рендеринг dot-кода в SVG
   // 1. Извлекаем все URL изображений из кода
-  // 2. Загружаем их для получения размеров
-  // 3. Регистрируем в d3-graphviz через addImage()
-  // 4. Запускаем рендеринг
+  // 2. Загружаем их для получения реальных размеров
+  // 3. Передаём через опцию images в viz.renderString()
+  //    (аналогично family-tree/ver2 — обеспечивает корректное
+  //     отображение узлов с image=, imagepos=tc, labelloc=b)
+  // 4. Вставляем SVG в страницу
   // ========================================================
   function zapustit() {
     // Получаем текущий код dot из редактора
@@ -255,48 +339,65 @@
     var urlIzobrazheny = izvlech_url_izobrazheny(dotKod);
 
     if (urlIzobrazheny.length === 0) {
-      // Изображений нет — рендерим напрямую без addImage
+      // Изображений нет — рендерим без передачи images
       vypolnit_render(dotKod, []);
     } else {
-      // Загружаем все изображения параллельно для получения размеров
+      // Загружаем все изображения параллельно для получения реальных размеров
       var obeshchaniya = [];
       for (var i = 0; i < urlIzobrazheny.length; i++) {
         obeshchaniya.push(zagrusit_izobrazhenie(urlIzobrazheny[i]));
       }
 
       Promise.all(obeshchaniya).then(function(razmery) {
-        vypolnit_render(dotKod, razmery);
+        // Формируем массив объектов для опции images в viz.renderString()
+        // Формат: [{name: 'url', width: px, height: px}, ...]
+        var imagesOption = [];
+        for (var j = 0; j < razmery.length; j++) {
+          imagesOption.push({
+            name: razmery[j].url,
+            width: razmery[j].width,
+            height: razmery[j].height
+          });
+        }
+        vypolnit_render(dotKod, imagesOption);
       });
     }
   }
 
   // ========================================================
-  // Выполняет непосредственный рендеринг через d3-graphviz
-  // razmery — массив объектов {url, width, height}
+  // Выполняет непосредственный рендеринг через @viz-js/viz
+  // imagesOption — массив объектов {name, width, height}
+  //
+  // Использует тот же подход, что family-tree/ver2/index.html:
+  //   viz.renderString(dotStr, { format: 'svg', engine: '...', images: [...] })
+  // Это обеспечивает правильный layout узлов с image=, imagepos=tc, labelloc=b
   // ========================================================
-  function vypolnit_render(dotKod, razmery) {
-    // Создаём объект рендерера d3-graphviz на контейнере #graph
-    var renderer = d3.select('#graph').graphviz({
-      useWorker: false,
-      fit: true,
-      zoom: true
+  function vypolnit_render(dotKod, imagesOption) {
+    var dvizhok = document.getElementById('engine-select').value;
+    var graphDiv = document.getElementById('graph');
+
+    // Используем @viz-js/viz — тот же движок, что в family-tree/ver2
+    // Опция images регистрирует размеры изображений в WASM до рендеринга
+    Viz.instance().then(function(viz) {
+      try {
+        var svgStr = viz.renderString(dotKod, {
+          format: 'svg',
+          engine: dvizhok,
+          images: imagesOption
+        });
+        graphDiv.innerHTML = svgStr;
+
+        // Применяем текущий масштаб к новому SVG
+        primenit_masshtab();
+
+      } catch (oshibka) {
+        document.getElementById('error-msg').textContent = 'Ошибка: ' + oshibka.message;
+        console.error(oshibka);
+      }
+    }).catch(function(oshibka) {
+      document.getElementById('error-msg').textContent = 'Ошибка инициализации: ' + oshibka.message;
+      console.error(oshibka);
     });
-
-    // Регистрируем изображения: это необходимо для корректного расчёта
-    // layout в WASM — без этого Graphviz не знает размеры изображений
-    for (var i = 0; i < razmery.length; i++) {
-      var r = razmery[i];
-      // addImage принимает путь/URL, ширину и высоту в пикселях
-      renderer.addImage(r.url, r.width + 'px', r.height + 'px');
-    }
-
-    // Назначаем обработчик ошибок рендеринга
-    renderer.onerror(function(soobshchenie) {
-      document.getElementById('error-msg').textContent = 'Ошибка: ' + soobshchenie;
-    });
-
-    // Запускаем рендеринг: dot-код -> SVG
-    renderer.renderDot(dotKod);
   }
 
   // ========================================================
@@ -322,6 +423,88 @@
         // Тихо игнорируем ошибку копирования
       });
     }
+  }
+
+  // ========================================================
+  // Скачивает текущий SVG-граф как файл
+  // ========================================================
+  function skachat_svg() {
+    var svgElement = document.querySelector('#graph svg');
+    if (!svgElement) {
+      alert('Сначала отрисуйте граф');
+      return;
+    }
+
+    // Сериализуем SVG в строку
+    var serializer = new XMLSerializer();
+    var svgStr = serializer.serializeToString(svgElement);
+
+    // Создаём Blob и ссылку для скачивания
+    var blob = new Blob([svgStr], { type: 'image/svg+xml;charset=utf-8' });
+    var url = URL.createObjectURL(blob);
+    var a = document.createElement('a');
+    a.href = url;
+    a.download = 'graph.svg';
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  }
+
+  // ========================================================
+  // Управление масштабом: применяет текущий масштаб к SVG
+  // ========================================================
+  function primenit_masshtab() {
+    var svgElement = document.querySelector('#graph svg');
+    if (!svgElement) return;
+
+    svgElement.style.transform = 'scale(' + tekuschiy_masshtab + ')';
+    svgElement.style.transformOrigin = 'top left';
+    document.getElementById('zoom-level').textContent = Math.round(tekuschiy_masshtab * 100) + '%';
+  }
+
+  // ========================================================
+  // Изменяет масштаб на указанный шаг (положительный — увеличение,
+  // отрицательный — уменьшение)
+  // ========================================================
+  function izmenity_masshtab(shag) {
+    tekuschiy_masshtab = Math.min(5.0, Math.max(0.1, tekuschiy_masshtab + shag));
+    // Округляем до одного знака после запятой во избежание накопления ошибок
+    tekuschiy_masshtab = Math.round(tekuschiy_masshtab * 10) / 10;
+    primenit_masshtab();
+  }
+
+  // ========================================================
+  // Сбрасывает масштаб до 100%
+  // ========================================================
+  function sbrosit_masshtab() {
+    tekuschiy_masshtab = 1.0;
+    primenit_masshtab();
+  }
+
+  // ========================================================
+  // Вписывает граф в видимую область правой панели
+  // ========================================================
+  function vpisat_v_okno() {
+    var svgElement = document.querySelector('#graph svg');
+    if (!svgElement) return;
+
+    var panel = document.getElementById('graph-scroll');
+    var panelW = panel.clientWidth - 20;
+    var panelH = panel.clientHeight - 20;
+
+    // Получаем размеры SVG без текущего масштабирования
+    var masshtab1 = 1.0 / tekuschiy_masshtab;
+    var svgW = svgElement.getBoundingClientRect().width * masshtab1;
+    var svgH = svgElement.getBoundingClientRect().height * masshtab1;
+
+    if (svgW <= 0 || svgH <= 0) return;
+
+    var masshtabX = panelW / svgW;
+    var masshtabY = panelH / svgH;
+    tekuschiy_masshtab = Math.min(masshtabX, masshtabY, 1.0);
+    tekuschiy_masshtab = Math.round(tekuschiy_masshtab * 100) / 100;
+    primenit_masshtab();
   }
 
   // ========================================================

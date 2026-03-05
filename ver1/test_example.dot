@@ -1,28 +1,33 @@
-// Тестовый пример dot-кода с использованием тега image="
+// Тестовый пример dot-кода с использованием тега image=
 // Изображения загружаются по HTTP-ссылкам с GitHub Pages
 // Этот пример демонстрирует работу ver1/index.html
+// Данный пример соответствует коду из issue #3:
+// https://github.com/bpmbpm/graphviz-online/issues/3
 
 digraph G {
   rankdir=TB;
   node [fontname="Arial", fontsize=11];
   edge [color="slategray"];
 
-  Ulyanov_Vladimir_Ilyich [shape=box, style="filled", fillcolor="lightsteelblue", color="darkslategray",
-    label="Ленин\nУльянов\nВладимир\nИльич\n1870–1924",
-    image="https://bpmbpm.github.io/family-tree/ver2/pic/Ульянов_Владимир_Ильич.png",
+  Ульянов_Владимир_Ильич [shape=box, style="filled", fillcolor="lightsteelblue", color="darkslategray",
+    label="Ленин\nУльянов\nВладимир\nИльич\n1870–1924", image="https://bpmbpm.github.io/family-tree/ver2/pic/Ульянов_Владимир_Ильич.png",
     fixedsize=true, width=1.1, height=1.9, fontsize=9.9,
     imagepos=tc, imagescale=false, labelloc=b];
-
-  Ulyanov_Ilya_Nikolaevich [shape=box, style="filled", fillcolor="lightsteelblue", color="darkslategray",
-    label="Ульянов\nИлья\nНиколаевич\n1831–1886",
-    image="https://bpmbpm.github.io/family-tree/ver2/pic/Ульянов_Илья_Николаевич.png",
+  Ульянов_Илья_Николаевич [shape=box, style="filled", fillcolor="lightsteelblue", color="darkslategray",
+    label="Ульянов\nИлья\nНиколаевич\n1831–1886", image="https://bpmbpm.github.io/family-tree/ver2/pic/Ульянов_Илья_Николаевич.png",
     fixedsize=true, width=1.1, height=1.9,
     imagepos=tc, imagescale=false, labelloc=b];
-
-  Blank_Maria_Alexandrovna [shape=box, style="filled", fillcolor="lightpink", color="darkslategray",
-    label="Ульянова\nБланк\nМария\nАлександровна\n1835–1916",
-    image="https://bpmbpm.github.io/family-tree/ver2/pic/Бланк_Мария_Александровна.png",
+  Бланк_Мария_Александровна [shape=box, style="filled", fillcolor="lightpink", color="darkslategray",
+    label="Ульянова\nБланк\nМария\nАлександровна\n1835–1916", image="https://bpmbpm.github.io/family-tree/ver2/pic/Бланк_Мария_Александровна.png",
     fixedsize=true, width=1.1, height=1.9, fontsize=9.9,
+    imagepos=tc, imagescale=false, labelloc=b];
+  Ульянин_Николай_Васильевич [shape=box, style="filled", fillcolor="lightsteelblue", color="darkslategray",
+    label="Ульянин\nНиколай\nВасильевич\n1768–1836", image="https://bpmbpm.github.io/family-tree/ver2/pic/dafaultm.png",
+    fixedsize=true, width=1.1, height=1.9,
+    imagepos=tc, imagescale=false, labelloc=b];
+  Смирнова_Анна_Алексеевна [shape=box, style="filled", fillcolor="lightpink", color="darkslategray",
+    label="Смирнова\nАнна\nАлексеевна\n1788–1871", image="https://bpmbpm.github.io/family-tree/ver2/pic/dafaultf.png",
+    fixedsize=true, width=1.1, height=1.9,
     imagepos=tc, imagescale=false, labelloc=b];
 
   subgraph cluster_marriage_0 {
@@ -30,10 +35,12 @@ digraph G {
     rank=same;
     style=dashed;
     color="slategray";
-    Ulyanov_Ilya_Nikolaevich;
-    Blank_Maria_Alexandrovna;
+    Ульянов_Илья_Николаевич;
+    Бланк_Мария_Александровна;
   }
 
-  Ulyanov_Ilya_Nikolaevich -> Ulyanov_Vladimir_Ilyich;
-  Blank_Maria_Alexandrovna -> Ulyanov_Vladimir_Ilyich;
+  Ульянов_Илья_Николаевич -> Ульянов_Владимир_Ильич;
+  Бланк_Мария_Александровна -> Ульянов_Владимир_Ильич;
+  Ульянин_Николай_Васильевич -> Ульянов_Илья_Николаевич;
+  Смирнова_Анна_Алексеевна -> Ульянов_Илья_Николаевич;
 }

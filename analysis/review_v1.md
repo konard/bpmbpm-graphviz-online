@@ -44,22 +44,34 @@
 
 Причина технического ограничения: все существующие браузерные Graphviz-решения используют Graphviz, скомпилированный в WebAssembly. Движок Graphviz при обработке `image="..."` обращается к файловой системе, а виртуальная ФС в WASM не может делать HTTP-запросы.
 
-## Решение
+## Почему family-tree/ver2 отображает узлы корректно, а dreampuf/GraphvizOnline — нет
 
-Для реализации одновременной поддержки URL-параметров и тега `image="` необходимо:
+`family-tree/ver2/index.html` использует библиотеку `@viz-js/viz` с методом `viz.renderString(dotStr, { images: [...] })`.
+Опция `images` позволяет передать массив `[{ name: 'url', width: px, height: px }]` прямо в движок WASM
+до начала рендеринга — Graphviz получает реальные размеры изображений и правильно вычисляет layout узлов
+(с `imagepos=tc`, `labelloc=b`).
 
-1. Использовать библиотеку **d3-graphviz** (на базе @hpcc-js/wasm), которая имеет метод `addImage(path, width, height)`.
+`dreampuf/GraphvizOnline` не передаёт `images` — WASM не знает размеры картинок и не может отобразить их.
+
+## Решение (реализовано в ver1/index.html)
+
+Для реализации одновременной поддержки URL-параметров и тега `image="`:
+
+1. Использовать библиотеку **@viz-js/viz** (тот же движок, что и в `family-tree/ver2`) с методом `viz.renderString()`.
 2. До вызова рендеринга парсить код dot и извлекать все URL из атрибутов `image="..."`.
 3. Загружать каждое изображение через браузер (`new Image()`), чтобы получить реальные размеры.
-4. Регистрировать каждое изображение через `addImage()` — это создаёт заглушку в виртуальной ФС WASM с указанными размерами, позволяя Graphviz правильно разместить узлы.
+4. Передавать массив `images` в `viz.renderString()` — это регистрирует размеры в WASM, обеспечивая корректный layout.
 5. После рендеринга SVG браузер сам загружает реальные изображения по URL через стандартный `<image href="...">` элемент SVG.
 
 Таким образом, **layout-вычисления** выполняются в WASM (с правильными размерами), а **отображение изображений** — браузером (по HTTP).
 
-Эта возможность реализована в `ver1/index.html`.
+Дополнительно в `ver1/index.html` реализованы:
+- Выбор движка Graphviz (dot, neato, fdp, sfdp, circo, twopi)
+- Кнопки управления масштабом (+, −, Сброс, Вписать)
+- Кнопка скачивания SVG
 
 ## Ссылки
 
-- [d3-graphviz: метод addImage](https://github.com/magjac/d3-graphviz#graphviz_addImage)
+- [@viz-js/viz: опция images в renderString](https://github.com/nicowillis/viz.js#renderstring)
 - [Исследование проблемы в family-tree PR #30](https://github.com/bpmbpm/family-tree/pull/30)
 - [Описание проблемы GraphvizOnline vs foto](https://github.com/bpmbpm/family-tree/blob/main/design/problem.md#1-graphvizonlin-vs-foto)
